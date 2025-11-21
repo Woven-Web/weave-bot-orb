@@ -62,6 +62,31 @@ class ContentProcessor:
 
         return json_ld_str, event_data
 
+    def extract_main_content(self, html: str) -> str:
+        """
+        Extract main content from HTML using trafilatura.
+
+        This removes boilerplate (nav, footer, ads) and returns just the article content.
+
+        Args:
+            html: Raw HTML content
+
+        Returns:
+            Extracted main content as text
+        """
+        # Use trafilatura to extract main content
+        # It's designed to extract article/main content and ignore boilerplate
+        extracted = trafilatura.extract(
+            html,
+            include_comments=False,
+            include_tables=True,
+            no_fallback=False,
+            favor_precision=False,  # We want more content for event pages
+            output_format='txt'
+        )
+
+        return extracted or ""
+
     def html_to_markdown(self, html: str) -> str:
         """
         Convert HTML to clean Markdown for LLM consumption.
@@ -161,3 +186,27 @@ class ContentProcessor:
             combined = combined[:40000] + "\n\n[Content truncated...]"
 
         return combined
+
+    # Keep legacy methods for backward compatibility
+    @staticmethod
+    def clean_html(html: str, max_length: int = 50000) -> str:
+        """Legacy method - use process() instead."""
+        processor = ContentProcessor()
+        return processor.html_to_markdown(html)[:max_length]
+
+    @staticmethod
+    def clean_text(text: str, max_length: int = 30000) -> str:
+        """Clean extracted text content."""
+        if not text:
+            return ""
+        text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+        text = re.sub(r' +', ' ', text)
+        if len(text) > max_length:
+            text = text[:max_length] + "..."
+        return text.strip()
+
+    @staticmethod
+    def extract_relevant_content(html: str, text: str, raw_html: str = "") -> str:
+        """Legacy method - use process() instead."""
+        processor = ContentProcessor()
+        return processor.process(raw_html or html, text)
