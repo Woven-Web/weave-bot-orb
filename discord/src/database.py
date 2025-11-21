@@ -28,7 +28,15 @@ class ParseRequest:
 
 class Database:
     def __init__(self, db_path: str = "weave_bot.db"):
+        import logging
+        import os
+        logger = logging.getLogger(__name__)
+
         self.db_path = db_path
+        abs_path = os.path.abspath(db_path)
+        logger.info(f'Database path: {db_path}')
+        logger.info(f'Absolute database path: {abs_path}')
+        logger.info(f'Current working directory: {os.getcwd()}')
         self._init_db()
 
     def _get_connection(self):
@@ -70,6 +78,9 @@ class Database:
         discord_response_id: int
     ) -> int:
         """Create a new parse request."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         conn = self._get_connection()
         try:
             cursor = conn.execute(
@@ -81,7 +92,9 @@ class Database:
                 (discord_message_id, discord_response_id, ParseStatus.PENDING.value)
             )
             conn.commit()
-            return cursor.lastrowid
+            row_id = cursor.lastrowid
+            logger.info(f'Created request in DB: id={row_id}, discord_message_id={discord_message_id}, discord_response_id={discord_response_id}')
+            return row_id
         finally:
             conn.close()
 
@@ -91,6 +104,9 @@ class Database:
         agent_request_id: str
     ) -> bool:
         """Update the agent request ID for a parse request."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         conn = self._get_connection()
         try:
             cursor = conn.execute(
@@ -104,7 +120,9 @@ class Database:
                 (agent_request_id, ParseStatus.IN_PROGRESS.value, discord_message_id)
             )
             conn.commit()
-            return cursor.rowcount > 0
+            updated = cursor.rowcount > 0
+            logger.info(f'Updated agent_id in DB: discord_message_id={discord_message_id}, agent_request_id={agent_request_id}, rows_updated={cursor.rowcount}')
+            return updated
         finally:
             conn.close()
 
@@ -115,6 +133,9 @@ class Database:
         result_url: Optional[str] = None
     ) -> Optional[ParseRequest]:
         """Update the status of a parse request by agent ID."""
+        import logging
+        logger = logging.getLogger(__name__)
+
         conn = self._get_connection()
         try:
             if result_url:
@@ -140,9 +161,14 @@ class Database:
                 )
 
             conn.commit()
+            logger.info(f'Updated status in DB: agent_request_id={agent_request_id}, status={status.value}, rows_updated={cursor.rowcount}')
 
             if cursor.rowcount > 0:
-                return await self.get_by_agent_id(agent_request_id)
+                result = await self.get_by_agent_id(agent_request_id)
+                logger.info(f'Found request after update: {result}')
+                return result
+            else:
+                logger.warning(f'No rows updated for agent_request_id={agent_request_id}')
             return None
         finally:
             conn.close()

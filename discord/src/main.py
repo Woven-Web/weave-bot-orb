@@ -31,8 +31,17 @@ async def main():
         return
 
     # Initialize database
-    db = Database(Config.DB_PATH)
-    logger.info(f'Database initialized at {Config.DB_PATH}')
+    # Ensure DB path is relative to the discord directory, not cwd
+    import pathlib
+    if not os.path.isabs(Config.DB_PATH):
+        # Make path relative to this file's directory (discord/src/)
+        project_root = pathlib.Path(__file__).parent.parent
+        db_path = str(project_root / Config.DB_PATH)
+    else:
+        db_path = Config.DB_PATH
+
+    db = Database(db_path)
+    logger.info(f'Database initialized at {db_path}')
 
     # Create bot and webhook server
     bot = WeaveBotClient(db)
