@@ -135,8 +135,9 @@ POST http://your-bot:3000/callback
 
 1. **Create a new Railway project** from the Railway dashboard
 2. **Connect your GitHub repository** (or deploy from CLI)
-3. **Set environment variables** (see below)
-4. **Deploy!** Railway will auto-detect Python and install dependencies
+3. **Set the root directory** to `discord` in Railway settings (since the bot is in a subdirectory)
+4. **Set environment variables** (see below)
+5. **Deploy!** Railway will auto-detect Python and install dependencies
 
 #### Important Considerations
 
@@ -184,7 +185,15 @@ WEBHOOK_HOST=0.0.0.0
 
 #### Build Configuration
 
-Railway will detect the Python project automatically. You can optionally add a `railway.toml`:
+**Important: Set Root Directory**
+
+Since the Discord bot is in the `discord/` subdirectory of your repository:
+
+1. In Railway project settings, go to **Settings** → **Service Settings**
+2. Set **Root Directory** to `discord`
+3. This tells Railway to treat the `discord/` folder as the project root
+
+The `railway.toml` file is already configured with the start command:
 
 ```toml
 [build]
@@ -194,7 +203,7 @@ builder = "NIXPACKS"
 startCommand = "uv run python -m src.main"
 ```
 
-Or set the start command in Railway settings:
+Alternatively, you can set the start command in Railway settings:
 ```bash
 uv run python -m src.main
 ```
