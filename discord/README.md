@@ -278,3 +278,11 @@ The bot will:
 - Start webhook server on configured port
 - Monitor configured channels
 - Log all activity to console
+
+# Notes on Discord bot
+
+Current permissions ID is `446676986944`
+![alt text](image-1.png)
+
+Add to your Discord with:
+`https://discord.com/api/oauth2/authorize?client_id={CLIENT_ID}&permissions=446676978752&scope=bot`
