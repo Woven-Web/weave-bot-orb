@@ -4,7 +4,7 @@ import logging
 from aiohttp import web
 from typing import Optional
 
-from .bot import WeaveBotClient
+from src.bot import WeaveBotClient
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +31,11 @@ class WebhookServer:
         Expected payload:
         {
             "request_id": "agent-request-id",
+            "discord_message_id": 123456789 (optional),
             "status": "completed" | "failed",
-            "result_url": "https://grist.example.com/..." (optional)
+            "event": { ... event data ... } (if successful),
+            "error": "error message" (if failed),
+            "result_url": "https://grist.example.com/..." (future: Grist link)
         }
         """
         try:
@@ -40,6 +43,8 @@ class WebhookServer:
 
             request_id = data.get('request_id')
             status = data.get('status')
+            event = data.get('event')
+            error = data.get('error')
             result_url = data.get('result_url')
 
             if not request_id or not status:
@@ -58,7 +63,9 @@ class WebhookServer:
             await self.bot.handle_parse_complete(
                 request_id,
                 status,
-                result_url
+                event=event,
+                error=error,
+                result_url=result_url
             )
 
             return web.json_response({'success': True})

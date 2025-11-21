@@ -31,8 +31,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routes
-app.include_router(router, prefix="/api/v1", tags=["scraping"])
+# Include API routes (no version prefix - keep it simple for now)
+app.include_router(router, tags=["scraping"])
 
 
 @app.on_event("startup")
@@ -55,7 +55,7 @@ async def root():
         "service": "Event Scraper API",
         "version": "0.1.0",
         "docs": "/docs",
-        "health": "/api/v1/health"
+        "health": "/health"
     }
 
 

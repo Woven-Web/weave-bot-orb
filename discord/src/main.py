@@ -9,10 +9,10 @@ import asyncio
 import logging
 import signal
 
-from .config import Config
-from .database import Database
-from .bot import WeaveBotClient
-from .webhook import WebhookServer
+from src.config import Config
+from src.database import Database
+from src.bot import WeaveBotClient
+from src.webhook import WebhookServer
 
 logging.basicConfig(
     level=logging.INFO,

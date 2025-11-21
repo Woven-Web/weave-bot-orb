@@ -5,9 +5,9 @@ import aiohttp
 import logging
 from typing import Optional
 
-from .config import Config
-from .database import Database, ParseStatus
-from .utils import is_link_message, extract_url
+from src.config import Config
+from src.database import Database, ParseStatus
+from src.utils import is_link_message, extract_url
 
 logging.basicConfig(
     level=logging.INFO,
@@ -26,6 +26,10 @@ class WeaveBotClient(discord.Client):
         self.db = db
         self.agent_api_url = Config.AGENT_API_URL
         self.monitored_channels = set(Config.DISCORD_CHANNELS)
+
+        # Build callback URL for agent to POST results back
+        # Agent will POST to this URL when parsing completes
+        self.callback_url = f"http://{Config.WEBHOOK_HOST}:{Config.WEBHOOK_PORT}/callback"
 
     async def on_ready(self):
         """Called when the bot is ready."""
@@ -84,7 +88,12 @@ class WeaveBotClient(discord.Client):
 
     async def _send_to_agent(self, url: str, message_id: int) -> Optional[str]:
         """
-        Send URL to agent API for parsing.
+        Send URL to agent API for async parsing.
+
+        The agent will:
+        1. Return a request_id immediately
+        2. Process the URL in the background
+        3. POST results to our callback_url when done
 
         Returns the agent request ID if successful, None otherwise.
         """
@@ -92,8 +101,11 @@ class WeaveBotClient(discord.Client):
             async with aiohttp.ClientSession() as session:
                 payload = {
                     "url": url,
+                    "callback_url": self.callback_url,
                     "discord_message_id": message_id
                 }
+
+                logger.info(f'Sending to agent: {payload}')
 
                 async with session.post(
                     self.agent_api_url,
@@ -102,7 +114,7 @@ class WeaveBotClient(discord.Client):
                 ) as response:
                     if response.status == 200:
                         data = await response.json()
-                        # Expecting response like: {"request_id": "abc-123"}
+                        # Expecting response like: {"request_id": "abc-123", "status": "accepted"}
                         return data.get("request_id")
                     else:
                         logger.error(
@@ -122,12 +134,21 @@ class WeaveBotClient(discord.Client):
         self,
         agent_request_id: str,
         status: str,
+        event: Optional[dict] = None,
+        error: Optional[str] = None,
         result_url: Optional[str] = None
     ):
         """
         Handle completion callback from the agent.
 
         This is called by the webhook when the agent finishes parsing.
+
+        Args:
+            agent_request_id: Unique ID from the agent
+            status: "completed" or "failed"
+            event: Extracted event data (if successful)
+            error: Error message (if failed)
+            result_url: URL to saved record (future: Grist link)
         """
         # Update database
         parse_status = ParseStatus.COMPLETED if status == "completed" else ParseStatus.FAILED
@@ -145,6 +166,7 @@ class WeaveBotClient(discord.Client):
         try:
             # Find channel (assuming we can access it from any monitored channel)
             channel = None
+            response_message = None
             for channel_id in self.monitored_channels:
                 try:
                     channel = await self.fetch_channel(channel_id)
@@ -167,13 +189,21 @@ class WeaveBotClient(discord.Client):
             original_message = await channel.fetch_message(request.discord_message_id)
 
             # Send completion message
-            if parse_status == ParseStatus.COMPLETED and result_url:
+            if parse_status == ParseStatus.COMPLETED and event:
+                # Format event data for Discord
+                reply_content = self._format_event_reply(event, result_url)
+                await original_message.reply(reply_content)
+            elif parse_status == ParseStatus.COMPLETED and result_url:
+                # Future: Grist link without event details
                 await original_message.reply(
                     f"All set! I've added your event: {result_url}"
                 )
             else:
+                # Failed
+                error_msg = error or "Unknown error"
                 await original_message.reply(
-                    "I couldn't parse that link. Could you double-check it's an event link and try again?"
+                    f"I couldn't parse that link. {error_msg}\n"
+                    "Could you double-check it's an event link and try again?"
                 )
 
             logger.info(f'Completed processing for agent request {agent_request_id}')
@@ -184,3 +214,62 @@ class WeaveBotClient(discord.Client):
             logger.error(f'No permission to access message {request.discord_response_id}')
         except Exception as e:
             logger.error(f'Error handling parse completion: {e}')
+
+    def _format_event_reply(self, event: dict, result_url: Optional[str] = None) -> str:
+        """
+        Format event data into a nice Discord message.
+
+        Args:
+            event: Event data dict from agent
+            result_url: Optional link to saved record (future: Grist)
+
+        Returns:
+            Formatted string for Discord reply
+        """
+        lines = []
+
+        # Title
+        title = event.get('title', 'Unknown Event')
+        lines.append(f"**{title}**")
+
+        # Date/time
+        start = event.get('start_datetime')
+        if start:
+            # Format datetime nicely
+            lines.append(f"When: {start}")
+
+        # Location
+        location = event.get('location')
+        if location:
+            venue = location.get('venue')
+            address = location.get('address')
+            if venue and address:
+                lines.append(f"Where: {venue}, {address}")
+            elif venue:
+                lines.append(f"Where: {venue}")
+            elif address:
+                lines.append(f"Where: {address}")
+
+        # Description (truncated)
+        description = event.get('description')
+        if description:
+            # Truncate long descriptions
+            if len(description) > 200:
+                description = description[:197] + "..."
+            lines.append(f"\n{description}")
+
+        # Price
+        price = event.get('price')
+        if price:
+            lines.append(f"Price: {price}")
+
+        # Result URL (future: Grist link)
+        if result_url:
+            lines.append(f"\nSaved to: {result_url}")
+
+        # Confidence indicator
+        confidence = event.get('confidence_score')
+        if confidence and confidence < 0.7:
+            lines.append("\n_Note: Some details may be incomplete_")
+
+        return "\n".join(lines)
