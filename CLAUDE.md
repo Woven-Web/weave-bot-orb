@@ -44,13 +44,15 @@ weave-bot-orb/
 ├── agent/                      # Event scraping API
 │   ├── main.py                 # FastAPI entry point
 │   ├── run.sh                  # Start script
-│   ├── .env                    # GEMINI_API_KEY config
+│   ├── .env                    # API keys (Gemini, Grist)
 │   ├── api/routes.py           # Endpoints: /scrape, /parse, /health
 │   ├── core/
 │   │   ├── config.py           # Settings from .env
 │   │   ├── schemas.py          # Pydantic models (Event, ParseRequest, etc.)
 │   │   ├── callback.py         # Sends results to Discord webhook
-│   │   └── tasks.py            # Background task runner
+│   │   └── tasks.py            # Background task runner + Grist save
+│   ├── integrations/
+│   │   └── grist.py            # Grist API client for saving events
 │   ├── scraper/
 │   │   ├── browser.py          # Playwright (fault-tolerant)
 │   │   ├── processor.py        # JSON-LD + trafilatura extraction
@@ -97,12 +99,55 @@ weave-bot-orb/
          │            - Playwright fetch        │
          │            - LLM extraction          │
          │            - JSON-LD override        │
+         │            - Save to Grist           │
          │                                      │
     5. POST /callback ◄─────────────────────────│
        {request_id, status, event, result_url}  │
          │                                      │
-    6. Update Discord with formatted event      │
+    6. Update Discord with event + Grist link   │
          │                                      │
+```
+
+---
+
+## Grist Integration
+
+Events are automatically saved to the **ORB Events** Grist document.
+
+### Grist Document
+
+- **Org**: OakLog (`oaklog.getgrist.com`)
+- **Document ID**: `b2r9qYM2Lr9xJ2epHVV1K2`
+- **Table**: `Events`
+- **View**: https://oaklog.getgrist.com/b2r9qYM2Lr9xJ2epHVV1K2/Events
+
+### Events Table Schema
+
+| Column          | Type     | Description             |
+| --------------- | -------- | ----------------------- |
+| Title           | Text     | Event name              |
+| StartDatetime   | DateTime | Start time              |
+| EndDatetime     | DateTime | End time                |
+| Venue           | Text     | Venue name              |
+| Address         | Text     | Street address          |
+| City            | Text     | City                    |
+| LocationType    | Choice   | physical/virtual/hybrid |
+| Description     | Text     | Event description       |
+| SourceURL       | Text     | Original event URL      |
+| Price           | Text     | Ticket price            |
+| Tags            | Text     | Comma-separated tags    |
+| ImageURL        | Text     | Event image             |
+| OrganizerName   | Text     | Organizer               |
+| ConfidenceScore | Numeric  | LLM confidence (0-1)    |
+| CreatedAt       | DateTime | When scraped            |
+
+### Configuration
+
+**agent/.env:**
+
+```
+GRIST_API_KEY=your_grist_api_key
+GRIST_DOC_ID=b2r9qYM2Lr9xJ2epHVV1K2
 ```
 
 ---
@@ -114,45 +159,25 @@ weave-bot-orb/
 | Endpoint  | Method | Description                                      |
 | --------- | ------ | ------------------------------------------------ |
 | `/scrape` | POST   | Sync scrape - returns full result                |
-| `/parse`  | POST   | Async parse - returns request_id, sends callback |
+| `/parse`  | POST   | Async parse - returns request_id, saves to Grist |
 | `/health` | GET    | Health check with active task count              |
 | `/docs`   | GET    | Swagger UI                                       |
 
-### Async Parse Request
+### Async Parse Flow
 
-```json
-{
-  "url": "https://lu.ma/event",
-  "callback_url": "http://discord-bot:3000/callback",
-  "discord_message_id": 123456789,
-  "include_screenshot": true,
-  "wait_time": 3000
-}
-```
-
-### Callback Payload (sent to Discord)
-
-```json
-{
-  "request_id": "uuid",
-  "discord_message_id": 123456789,
-  "status": "completed",
-  "event": {
-    "title": "Event Name",
-    "start_datetime": "2025-11-20T18:30:00",
-    "location": { "venue": "...", "address": "..." },
-    "confidence_score": 0.85
-  },
-  "result_url": null
-}
-```
+1. Receive URL + callback_url
+2. Return `request_id` immediately
+3. Background: scrape → extract → save to Grist
+4. POST callback with event data + Grist URL
 
 ### Configuration
 
 **agent/.env:**
 
 ```
-GEMINI_API_KEY=your_key_here
+GEMINI_API_KEY=your_gemini_key
+GRIST_API_KEY=your_grist_key
+GRIST_DOC_ID=b2r9qYM2Lr9xJ2epHVV1K2
 HEADLESS=true
 BROWSER_TIMEOUT=30000
 ```
@@ -162,9 +187,9 @@ BROWSER_TIMEOUT=30000
 | File                      | Purpose                                         |
 | ------------------------- | ----------------------------------------------- |
 | `api/routes.py`           | `/scrape` (sync) and `/parse` (async) endpoints |
-| `core/tasks.py`           | Background task runner using asyncio            |
+| `core/tasks.py`           | Background task runner, Grist integration       |
 | `core/callback.py`        | Sends results to Discord webhook                |
-| `core/schemas.py`         | ParseRequest, ParseResponse, CallbackPayload    |
+| `integrations/grist.py`   | Grist API client                                |
 | `scraper/orchestrator.py` | Main scraping pipeline                          |
 
 ---
@@ -178,8 +203,9 @@ BROWSER_TIMEOUT=30000
 3. Agent returns `request_id` immediately
 4. Bot stores request in SQLite (status: IN_PROGRESS)
 5. Agent processes in background (2-20 seconds)
-6. Agent POSTs callback to Bot's webhook server
-7. Bot updates Discord with formatted event details
+6. Agent saves to Grist, gets record URL
+7. Agent POSTs callback to Bot's webhook server
+8. Bot updates Discord with event details + Grist link
 
 ### Configuration
 
@@ -229,6 +255,8 @@ DB_PATH=weave_bot.db
 
 **Browser timeout**: Increase `BROWSER_TIMEOUT` in .env
 
+**Grist save failed**: Check `GRIST_API_KEY` in .env
+
 ### Discord Issues
 
 **Bot not responding**: Check DISCORD_CHANNELS includes the channel ID
@@ -237,33 +265,11 @@ DB_PATH=weave_bot.db
 
 **Callback not received**: Verify WEBHOOK_PORT is accessible from agent
 
-### Integration Issues
-
-**Callback URL unreachable**: When running locally, both services need to reach each other. Use `localhost` for same machine.
-
-**Request not found**: Check that `discord_message_id` is being passed through correctly.
-
 ---
 
 ## Future Enhancements
 
-### Grist Integration (Next)
-
-The callback system is designed for Grist integration:
-
-1. Agent successfully parses event
-2. Agent saves event to Grist database
-3. Agent includes `result_url` (Grist link) in callback
-4. Discord shows "Added to database: {result_url}"
-
-Changes needed:
-
-- Add `agent/integrations/grist.py`
-- Modify `core/tasks.py` to save to Grist after successful parse
-- Discord bot already handles `result_url` in callback
-
-### Other Future Work
-
+- **Duplicate detection**: Check if event URL already exists in Grist
 - **Batch scraping**: Multiple URLs in one request
-- **Event editing**: Allow users to correct parsed data
-- **Duplicate detection**: Check if event already exists in Grist
+- **Event editing**: Allow users to correct parsed data via Discord
+- **Scheduled scraping**: Auto-scrape known event sources

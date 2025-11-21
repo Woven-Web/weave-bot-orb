@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from agent.core.callback import send_callback
 from agent.core.schemas import Event
 from agent.scraper.orchestrator import ScrapingOrchestrator
+from agent.integrations.grist import save_event_to_grist
 
 logger = logging.getLogger(__name__)
 
@@ -93,12 +94,21 @@ class TaskRunner:
             error = str(e)
             logger.exception(f"Task {task.request_id} crashed: {e}")
 
-        # Send callback with results
-        # Future: This is where Grist integration would go
-        # 1. If successful, save event to Grist
-        # 2. Get result_url from Grist response
-        # 3. Include result_url in callback
-        result_url = None  # TODO: Grist integration
+        # Save to Grist if successful
+        result_url = None
+        if status == "completed" and event:
+            grist_result = await save_event_to_grist(event)
+            if grist_result.success:
+                result_url = grist_result.record_url
+                logger.info(
+                    f"Task {task.request_id} saved to Grist: {result_url}"
+                )
+            else:
+                # Log but don't fail the whole task
+                logger.warning(
+                    f"Task {task.request_id} Grist save failed: "
+                    f"{grist_result.error}"
+                )
 
         await send_callback(
             callback_url=task.callback_url,

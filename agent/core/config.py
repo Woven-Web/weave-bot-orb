@@ -10,20 +10,24 @@ ENV_FILE = AGENT_DIR / ".env"
 
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
-    
+
     # Gemini API
     gemini_api_key: str
-    
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
     log_level: str = "info"
-    
+
     # Browser
     headless: bool = True
     browser_timeout: int = 30000  # milliseconds
     screenshot_enabled: bool = True
-    
+
+    # Grist integration
+    grist_api_key: str = ""
+    grist_doc_id: str = "b2r9qYM2Lr9xJ2epHVV1K2"  # ORB Events document
+
     model_config = SettingsConfigDict(
         env_file=str(ENV_FILE),
         env_file_encoding="utf-8",
