@@ -24,7 +24,7 @@ RUN apt-get update && apt-get install -y \
     libx11-6 \
     && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
+# Set working directory - this is where Railway copies files to
 WORKDIR /app
 
 # Copy requirements first for better caching
@@ -34,15 +34,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install Playwright browsers
 RUN playwright install chromium
 
-# Copy the rest of the application
-COPY . .
-
-# Set PYTHONPATH so 'agent' module is found
-ENV PYTHONPATH=/app
+# Copy the application code into an 'agent' subdirectory
+# This way 'agent.main' import works correctly
+COPY . ./agent/
 
 # Expose port (Railway uses PORT env var)
 EXPOSE 8000
 
 # Run the application with uvicorn
 # Railway sets PORT env var, so we use that
-CMD ["sh", "-c", "uvicorn agent.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "cd /app && uvicorn agent.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
