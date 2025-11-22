@@ -40,8 +40,9 @@ COPY . .
 # Set PYTHONPATH so 'agent' module is found
 ENV PYTHONPATH=/app
 
-# Expose port
+# Expose port (Railway uses PORT env var)
 EXPOSE 8000
 
-# Run the application
-CMD ["python", "-m", "agent.main"]
+# Run the application with uvicorn
+# Railway sets PORT env var, so we use that
+CMD ["sh", "-c", "uvicorn agent.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
