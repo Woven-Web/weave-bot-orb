@@ -291,3 +291,30 @@ class Database:
             return updated
         finally:
             conn.close()
+
+    async def update_response_id(
+        self,
+        agent_request_id: str,
+        new_response_id: int
+    ) -> bool:
+        """Update the Discord response ID (when the final reply replaces the parsing message)."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        conn = self._get_connection()
+        try:
+            cursor = conn.execute(
+                """
+                UPDATE parse_requests
+                SET discord_response_id = ?,
+                    updated_at = CURRENT_TIMESTAMP
+                WHERE agent_request_id = ?
+                """,
+                (new_response_id, agent_request_id)
+            )
+            conn.commit()
+            updated = cursor.rowcount > 0
+            logger.info(f'Updated discord_response_id in DB: agent_request_id={agent_request_id}, new_response_id={new_response_id}, rows_updated={cursor.rowcount}')
+            return updated
+        finally:
+            conn.close()

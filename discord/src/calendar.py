@@ -166,18 +166,10 @@ def generate_orb_calendar_markdown(events: list[dict]) -> str:
             # Build event line
             event_line = f"**{time_str}, {location}**."
 
-            # Use editorial if available, otherwise fall back to description
+            # Only show editorial text (human-written commentary)
             editorial = event.get("editorial")
-            description = event.get("description")
-
             if editorial:
-                # Editorial is human-written, use it directly
                 event_line += f" {editorial}"
-            elif description:
-                # Truncate auto-generated description if too long
-                if len(description) > 200:
-                    description = description[:197] + "..."
-                event_line += f" {description}"
 
             # Add source link if available
             source_url = event.get("source_url")

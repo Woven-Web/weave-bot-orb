@@ -208,23 +208,28 @@ class WeaveBotClient(discord.Client):
             # Get original message to reply to
             original_message = await channel.fetch_message(request.discord_message_id)
 
-            # Send completion message
+            # Send completion message and track the new message ID for reply detection
+            final_reply = None
             if parse_status == ParseStatus.COMPLETED and event:
                 # Format event data for Discord
                 reply_content = self._format_event_reply(event, result_url)
-                await original_message.reply(reply_content)
+                final_reply = await original_message.reply(reply_content)
             elif parse_status == ParseStatus.COMPLETED and result_url:
-                # Future: Grist link without event details
-                await original_message.reply(
+                # Grist link without event details
+                final_reply = await original_message.reply(
                     f"All set! I've added your event: {result_url}"
                 )
             else:
                 # Failed
                 error_msg = error or "Unknown error"
-                await original_message.reply(
+                final_reply = await original_message.reply(
                     f"I couldn't parse that link. {error_msg}\n"
                     "Could you double-check it's an event link and try again?"
                 )
+
+            # Update database with the new reply message ID for editorial reply detection
+            if final_reply:
+                await self.db.update_response_id(agent_request_id, final_reply.id)
 
             logger.info(f'Completed processing for agent request {agent_request_id}')
 
