@@ -29,11 +29,18 @@ class GristResult:
 
 
 def _format_datetime(dt: Optional[datetime]) -> Optional[str]:
-    """Format datetime for Grist API."""
+    """
+    Format datetime for Grist API.
+
+    We strip timezone info and send naive datetime to prevent Grist
+    from converting to UTC. All events are assumed to be Pacific Time.
+    """
     if dt is None:
         return None
-    # Grist expects ISO format
-    return dt.isoformat()
+    # Strip timezone to prevent Grist from converting to UTC
+    # The datetime is already in the correct local time (Pacific)
+    naive_dt = dt.replace(tzinfo=None)
+    return naive_dt.isoformat()
 
 
 def _event_to_grist_fields(event: Event) -> dict:
