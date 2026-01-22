@@ -126,9 +126,10 @@ async def save_event_to_grist(
                     if records:
                         record_id = records[0].get("id")
                         # Build URL to the record in Grist
-                        # Format: https://oaklog.getgrist.com/DOC_ID/PAGE_NAME#a1.s1.rROW_ID.c0
-                        # The anchor format is: a=area, s=section, r=row, c=column
-                        record_url = f"https://oaklog.getgrist.com/{GRIST_UI_DOC_ID}/{GRIST_UI_PAGE_NAME}#a1.s1.r{record_id}.c0"
+                        # Format: https://oaklog.getgrist.com/DOC_ID/PAGE_NAME#a1.s4.rROW_ID.c0
+                        # The anchor format is: a=area, s=section/widget, r=row, c=column
+                        # s4 is the Events table widget on the ORB-Events page
+                        record_url = f"https://oaklog.getgrist.com/{GRIST_UI_DOC_ID}/{GRIST_UI_PAGE_NAME}#a1.s4.r{record_id}.c0"
 
                         logger.info(
                             f"Event saved to Grist: record_id={record_id}, "
