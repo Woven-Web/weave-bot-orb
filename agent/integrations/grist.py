@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 GRIST_API_BASE = "https://docs.getgrist.com/api"
 GRIST_DOC_ID = getattr(settings, 'grist_doc_id', None) or "b2r9qYM2Lr9xJ2epHVV1K2"
 GRIST_TABLE = "Events"
+# Short doc ID and page name for UI URLs (different from API doc ID)
+GRIST_UI_DOC_ID = "b2r9qYM2Lr9x"
+GRIST_UI_PAGE_NAME = "ORB-Events"
 
 
 @dataclass
@@ -123,8 +126,9 @@ async def save_event_to_grist(
                     if records:
                         record_id = records[0].get("id")
                         # Build URL to the record in Grist
-                        # Format: https://oaklog.getgrist.com/DOC_ID/Events/p/1
-                        record_url = f"https://oaklog.getgrist.com/{doc_id}/Events"
+                        # Format: https://oaklog.getgrist.com/DOC_ID/PAGE_NAME#a1.s1.rROW_ID.c0
+                        # The anchor format is: a=area, s=section, r=row, c=column
+                        record_url = f"https://oaklog.getgrist.com/{GRIST_UI_DOC_ID}/{GRIST_UI_PAGE_NAME}#a1.s1.r{record_id}.c0"
 
                         logger.info(
                             f"Event saved to Grist: record_id={record_id}, "
