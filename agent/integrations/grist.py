@@ -1,12 +1,13 @@
 """Grist integration for saving events to the ORB Events database."""
 import aiohttp
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from typing import Optional
 from dataclasses import dataclass
 
 from agent.core.schemas import Event
 from agent.core.config import settings
+from agent.core.time_utils import get_current_time
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +61,7 @@ def _event_to_grist_fields(event: Event) -> dict:
         "ImageURL": event.image_url,
         "ConfidenceScore": event.confidence_score,
         # Use Pacific Time for CreatedAt (naive datetime, no tz conversion by Grist)
-        "CreatedAt": datetime.now(timezone(timedelta(hours=-8))).replace(tzinfo=None).isoformat(),
+        "CreatedAt": get_current_time().replace(tzinfo=None).isoformat(),
     }
 
     # Location fields

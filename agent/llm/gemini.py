@@ -13,6 +13,7 @@ import io
 from agent.llm.base import LLMExtractor
 from agent.core.schemas import Event, EventLocation, EventOrganizer
 from agent.core.config import settings
+from agent.core.time_utils import get_current_time, get_pacific_offset_str
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +33,10 @@ class GeminiExtractor(LLMExtractor):
 
     def _build_extraction_prompt(self, url: str, content: str) -> str:
         """Build the prompt for event extraction."""
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        current_year = datetime.now().year
+        now = get_current_time()
+        current_date = now.strftime("%Y-%m-%d")
+        current_year = now.year
+        pacific_offset = get_pacific_offset_str()
 
         return f"""You are an expert at extracting structured event information from web pages.
 
@@ -46,8 +49,8 @@ Your task is to extract event information and return it as valid JSON matching t
 {{
   "title": "string (required - the event name/title)",
   "description": "string or null (event description/details)",
-  "start_datetime": "ISO 8601 datetime WITH timezone offset (e.g., '2026-01-20T18:30:00-08:00')",
-  "end_datetime": "ISO 8601 datetime WITH timezone offset or null (e.g., '2026-01-20T21:00:00-08:00')",
+  "start_datetime": "ISO 8601 datetime WITH timezone offset (e.g., '2026-01-20T18:30:00{pacific_offset}')",
+  "end_datetime": "ISO 8601 datetime WITH timezone offset or null (e.g., '2026-01-20T21:00:00{pacific_offset}')",
   "timezone": "string or null (e.g., 'America/Los_Angeles', 'PST') - also include offset in datetimes above",
   "location": {{
     "type": "physical" | "virtual" | "hybrid",
@@ -79,7 +82,7 @@ IMPORTANT INSTRUCTIONS:
    - When in doubt, assume the current year ({current_year})
 4. For timezone:
    - ALWAYS include timezone offset in the datetime string
-   - Default to Pacific Time: -08:00 (PST, Nov-Mar) or -07:00 (PDT, Mar-Nov)
+   - Default to Pacific Time: {pacific_offset} (current offset, accounts for DST)
    - Only use a different timezone if explicitly stated in the content
 5. If the page contains MULTIPLE events, extract the PRIMARY or FIRST event
 6. Set confidence_score based on how complete and certain the information is
@@ -235,8 +238,10 @@ Return your JSON response now:"""
 
     def _build_image_extraction_prompt(self) -> str:
         """Build the prompt for extracting event info from an image."""
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        current_year = datetime.now().year
+        now = get_current_time()
+        current_date = now.strftime("%Y-%m-%d")
+        current_year = now.year
+        pacific_offset = get_pacific_offset_str()
 
         return f"""You are an expert at extracting event information from images such as event posters, flyers, screenshots, and promotional materials.
 
@@ -247,8 +252,8 @@ Analyze the attached image and extract event information. Return valid JSON matc
 {{
   "title": "string (required - the event name/title)",
   "description": "string or null (event description/details visible in the image)",
-  "start_datetime": "ISO 8601 datetime WITH timezone offset (e.g., '2026-01-20T18:30:00-08:00')",
-  "end_datetime": "ISO 8601 datetime WITH timezone offset or null (e.g., '2026-01-20T21:00:00-08:00')",
+  "start_datetime": "ISO 8601 datetime WITH timezone offset (e.g., '2026-01-20T18:30:00{pacific_offset}')",
+  "end_datetime": "ISO 8601 datetime WITH timezone offset or null (e.g., '2026-01-20T21:00:00{pacific_offset}')",
   "timezone": "string or null (e.g., 'America/Los_Angeles', 'PST') - also include offset in datetimes above",
   "location": {{
     "type": "physical" | "virtual" | "hybrid",
@@ -279,8 +284,8 @@ IMPORTANT INSTRUCTIONS:
    - Exception: In Nov/Dec, if the event is for Jan/Feb without a year, use {current_year + 1}
    - When in doubt, assume the current year ({current_year})
 4. For timezone:
-   - ALWAYS include timezone offset in datetime (e.g., '2026-01-20T19:00:00-08:00')
-   - Default to Pacific Time: -08:00 (PST, Nov-Mar) or -07:00 (PDT, Mar-Nov)
+   - ALWAYS include timezone offset in datetime (e.g., '2026-01-20T19:00:00{pacific_offset}')
+   - Default to Pacific Time: {pacific_offset} (current offset, accounts for DST)
    - Only use a different timezone if explicitly stated in the image
 5. Read ALL text in the image carefully - event details are often in smaller text
 6. Set confidence_score LOWER if:

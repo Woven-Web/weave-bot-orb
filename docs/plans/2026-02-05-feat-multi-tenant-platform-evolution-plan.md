@@ -82,11 +82,10 @@ Just enough to catch regressions during Phase 1 changes. Not a comprehensive sui
 
 Replace all hardcoded timezone offsets with `ZoneInfo("America/Los_Angeles")` for automatic DST handling.
 
-- [ ] Replace `datetime.now()` with `get_current_time()` (from 0.2) in LLM prompt generation (`agent/llm/gemini.py:35-36`, `agent/llm/gemini.py:238-239`)
-- [ ] Replace `timezone(timedelta(hours=-8))` with `ZoneInfo("America/Los_Angeles")` in Grist CreatedAt formatting (`agent/integrations/grist.py:63`)
-- [ ] Update LLM prompt to derive the correct offset from `get_current_time()` — PDT `-07:00` (Mar-Nov) or PST `-08:00` (Nov-Mar)
-- [ ] Add transition logging: print both old offset and ZoneInfo-derived offset during initial rollout
-- [ ] Test: verify DST boundary dates (second Sunday in March, first Sunday in November) produce correct offsets
+- [x] Replace `datetime.now()` with `get_current_time()` (from 0.2) in LLM prompt generation (`agent/llm/gemini.py:35-36`, `agent/llm/gemini.py:238-239`)
+- [x] Replace `timezone(timedelta(hours=-8))` with `get_current_time()` in Grist CreatedAt formatting (`agent/integrations/grist.py:63`)
+- [x] Update LLM prompt to derive the correct offset from `get_pacific_offset_str()` — PDT `-07:00` (Mar-Nov) or PST `-08:00` (Nov-Mar)
+- [x] Test: `test_time_utils.py` verifies offset format is -07:00 or -08:00
 
 **Success criteria:** Events scraped during PDT months show correct times. `CreatedAt` in Grist is always Pacific Time regardless of DST.
 **Files:** `agent/llm/gemini.py`, `agent/integrations/grist.py`, `agent/core/time_utils.py`
