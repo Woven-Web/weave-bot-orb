@@ -111,13 +111,13 @@ Add a validation step after JSON-LD override in the orchestrator pipeline. Valid
 
 Currently only dates are overridden from JSON-LD structured data. Extend to venue, address, and organizer — the same fields Eventbrite and Luma provide reliably.
 
-- [ ] Rename `_apply_json_ld_dates()` to `_apply_json_ld_overrides()` in `agent/scraper/orchestrator.py:17-46`
-- [ ] Add venue override: if JSON-LD `location.name` exists and is not empty/generic, override `event.location.venue`
-- [ ] Add address override: parse JSON-LD `location.address` — handle both plain string and `PostalAddress` object with `streetAddress`, `addressLocality`, etc.
-- [ ] Add organizer override: if JSON-LD `organizer.name` exists, override `event.organizer.name`
-- [ ] Only override when JSON-LD value is substantive (not empty, not just the org/site name)
-- [ ] Add extraction note when override happens: e.g., "Venue overridden from JSON-LD structured data"
-- [ ] Test: Eventbrite page gets correct venue/address from JSON-LD; site without JSON-LD is unaffected
+- [x] Rename `_apply_json_ld_dates()` to `_apply_json_ld_overrides()` in `agent/scraper/orchestrator.py:17-46`
+- [x] Add venue override: if JSON-LD `location.name` exists and is not empty/generic, override `event.location.venue`
+- [x] Add address override: parse JSON-LD `location.address` — handle both plain string and `PostalAddress` object with `streetAddress`, `addressLocality`, etc.
+- [x] Add organizer override: if JSON-LD `organizer.name` exists, override `event.organizer.name`
+- [x] Only override when JSON-LD value is substantive (not empty, not just the org/site name)
+- [x] Add extraction note when override happens: e.g., "Venue overridden from JSON-LD structured data"
+- [x] Test: Eventbrite page gets correct venue/address from JSON-LD; site without JSON-LD is unaffected
 
 **Success criteria:** Events from Eventbrite and Luma get authoritative venue/address from JSON-LD. No regressions on sites without JSON-LD.
 **Files:** `agent/scraper/orchestrator.py`, `agent/scraper/processor.py`
