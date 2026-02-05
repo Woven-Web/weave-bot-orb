@@ -94,15 +94,15 @@ Replace all hardcoded timezone offsets with `ZoneInfo("America/Los_Angeles")` fo
 
 Add a validation step after JSON-LD override in the orchestrator pipeline. Validation warns but never rejects — lowers confidence and adds extraction notes.
 
-- [ ] Add `_validate_event()` method to `ScrapingOrchestrator` (or a small `validate_event()` function in `agent/core/validation.py` if it needs reuse)
-- [ ] Validation rules:
+- [x] Add `validate_event()` function in `agent/core/validation.py`
+- [x] Validation rules:
   - `start_datetime` not more than 1 year in the past
   - `start_datetime` not more than 2 years in the future
   - `end_datetime > start_datetime` (if both present)
   - If `end_datetime < start_datetime`: null out `end_datetime`, add extraction note
   - If `title` is empty or "Extraction Failed": flag, lower confidence
-- [ ] Call validation after `_apply_json_ld_overrides()` in orchestrator pipeline
-- [ ] Test: events with bad dates get lower confidence + notes, never silently rejected
+- [x] Call validation after JSON-LD override in orchestrator pipeline
+- [x] Test: 10 validation tests covering all rules, edge cases, and confidence floor
 
 **Success criteria:** No events saved with obviously wrong years. Validation warnings visible in `extraction_notes`.
 **Files:** `agent/scraper/orchestrator.py` (or `agent/core/validation.py`)

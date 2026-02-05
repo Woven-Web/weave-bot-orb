@@ -4,6 +4,7 @@ from agent.scraper.browser import BrowserManager
 from agent.scraper.processor import ContentProcessor
 from agent.llm.gemini import GeminiExtractor
 from agent.core.schemas import Event, ScrapeResponse
+from agent.core.validation import validate_event
 
 
 class ScrapingOrchestrator:
@@ -112,6 +113,9 @@ class ScrapingOrchestrator:
             json_ld_data = self.content_processor.get_json_ld_event_data()
             if json_ld_data:
                 event = self._apply_json_ld_dates(event, json_ld_data)
+
+            # Step 5: Validate extracted data (warns but never rejects)
+            event = validate_event(event)
 
             metadata["confidence_score"] = event.confidence_score
 
