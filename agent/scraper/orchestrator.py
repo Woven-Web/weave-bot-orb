@@ -2,6 +2,7 @@
 from typing import Dict, Any, Optional
 from agent.scraper.browser import BrowserManager
 from agent.scraper.processor import ContentProcessor
+from agent.llm.base import LLMExtractor
 from agent.llm.gemini import GeminiExtractor
 from agent.core.schemas import Event, ScrapeResponse
 from agent.core.validation import validate_event
@@ -10,9 +11,9 @@ from agent.core.validation import validate_event
 class ScrapingOrchestrator:
     """Orchestrates the complete event scraping pipeline."""
 
-    def __init__(self):
-        """Initialize the orchestrator with LLM extractor."""
-        self.llm_extractor = GeminiExtractor()
+    def __init__(self, llm_extractor: Optional[LLMExtractor] = None):
+        """Initialize the orchestrator with optional LLM extractor."""
+        self.llm_extractor = llm_extractor or GeminiExtractor()
         self.content_processor = ContentProcessor()
 
     def _apply_json_ld_overrides(self, event: Event, json_ld_data: Dict[str, Any]) -> Event:

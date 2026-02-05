@@ -134,6 +134,63 @@ Return your JSON response now:"""
 
         return None
 
+    async def _generate_and_parse(
+        self,
+        parts: list,
+        post_parse: Optional[callable] = None,
+        error_context: str = "extraction",
+    ) -> tuple[Optional[Dict[str, Any]], str]:
+        """Shared retry loop with JSON repair for Gemini calls.
+
+        Returns (event_data_dict, last_response_text). event_data is None on failure.
+        """
+        last_error = None
+        response_text = ""
+
+        for attempt in range(self.max_retries):
+            try:
+                response = self.model.generate_content(parts)
+                response_text = self._clean_response_text(response.text)
+
+                try:
+                    event_data = json.loads(response_text)
+                except json.JSONDecodeError as json_error:
+                    logger.warning(f"JSON parse failed, attempting repair: {json_error}")
+                    event_data = self._repair_json(response_text)
+                    if event_data is None:
+                        raise json_error
+                    existing_notes = event_data.get('extraction_notes', '') or ''
+                    event_data['extraction_notes'] = f"JSON parsing required repair. {existing_notes}".strip()
+                    logger.info("JSON repair successful")
+
+                if post_parse:
+                    post_parse(event_data)
+
+                return event_data, response_text
+
+            except Exception as e:
+                last_error = e
+                error_str = str(e)
+
+                if attempt < self.max_retries - 1:
+                    if "429" in error_str:
+                        sleep_time = self.base_delay * (2 ** attempt)
+                        logger.warning(f"Rate limited (429), retrying in {sleep_time}s (attempt {attempt + 1}/{self.max_retries})")
+                        await asyncio.sleep(sleep_time)
+                    elif "quota" in error_str.lower():
+                        sleep_time = self.base_delay * (2 ** attempt)
+                        logger.warning(f"Quota issue, retrying in {sleep_time}s (attempt {attempt + 1}/{self.max_retries})")
+                        await asyncio.sleep(sleep_time)
+                    else:
+                        logger.warning(f"{error_context} error, retrying: {error_str[:100]}")
+                        await asyncio.sleep(1)
+                    continue
+                break
+
+        error_msg = f"Failed after {self.max_retries} attempts: {str(last_error)}"
+        logger.error(f"{error_context} failed: {error_msg}")
+        return None, response_text
+
     async def extract_event(
         self,
         url: str,
@@ -152,11 +209,8 @@ Return your JSON response now:"""
             Extracted Event object
         """
         prompt = self._build_extraction_prompt(url, content)
-
-        # Prepare content parts for Gemini
         parts = [prompt]
 
-        # Add screenshot if provided
         if screenshot_b64:
             try:
                 image_bytes = base64.b64decode(screenshot_b64)
@@ -165,70 +219,17 @@ Return your JSON response now:"""
             except Exception as e:
                 logger.warning(f"Could not process screenshot: {e}")
 
-        # Retry loop with exponential backoff
-        last_error = None
-        response_text = ""
+        def _set_source_url(data):
+            data['source_url'] = url
 
-        for attempt in range(self.max_retries):
-            try:
-                # Generate response
-                response = self.model.generate_content(parts)
-                response_text = self._clean_response_text(response.text)
+        event_data, response_text = await self._generate_and_parse(
+            parts, post_parse=_set_source_url, error_context=f"Extraction for {url}"
+        )
 
-                # Try to parse JSON
-                try:
-                    event_data = json.loads(response_text)
-                except json.JSONDecodeError as json_error:
-                    # Attempt JSON repair
-                    logger.warning(f"JSON parse failed, attempting repair: {json_error}")
-                    event_data = self._repair_json(response_text)
+        if event_data is not None:
+            return Event(**event_data)
 
-                    if event_data is None:
-                        raise json_error
-
-                    # Mark as repaired
-                    existing_notes = event_data.get('extraction_notes', '') or ''
-                    event_data['extraction_notes'] = f"JSON parsing required repair. {existing_notes}".strip()
-                    logger.info("JSON repair successful")
-
-                # Add source URL
-                event_data['source_url'] = url
-
-                # Convert to Event object (Pydantic will validate)
-                event = Event(**event_data)
-                return event
-
-            except Exception as e:
-                last_error = e
-                error_str = str(e)
-
-                # Check for rate limit (429) error
-                if "429" in error_str and attempt < self.max_retries - 1:
-                    sleep_time = self.base_delay * (2 ** attempt)
-                    logger.warning(f"Rate limited (429), retrying in {sleep_time}s (attempt {attempt + 1}/{self.max_retries})")
-                    await asyncio.sleep(sleep_time)
-                    continue
-
-                # Check for quota exhausted
-                if "quota" in error_str.lower() and attempt < self.max_retries - 1:
-                    sleep_time = self.base_delay * (2 ** attempt)
-                    logger.warning(f"Quota issue, retrying in {sleep_time}s (attempt {attempt + 1}/{self.max_retries})")
-                    await asyncio.sleep(sleep_time)
-                    continue
-
-                # For other errors on non-final attempt, retry with shorter delay
-                if attempt < self.max_retries - 1:
-                    logger.warning(f"Extraction error, retrying: {error_str[:100]}")
-                    await asyncio.sleep(1)
-                    continue
-
-                # Final attempt failed
-                break
-
-        # All retries exhausted
-        error_msg = f"Failed after {self.max_retries} attempts: {str(last_error)}"
-        logger.error(f"Extraction failed for {url}: {error_msg}")
-
+        error_msg = f"Failed after {self.max_retries} attempts"
         return Event(
             title="Extraction Failed",
             source_url=url,
@@ -317,7 +318,6 @@ Return your JSON response now:"""
         """
         prompt = self._build_image_extraction_prompt()
 
-        # Decode image
         try:
             image_bytes = base64.b64decode(image_b64)
             image = Image.open(io.BytesIO(image_bytes))
@@ -330,78 +330,20 @@ Return your JSON response now:"""
                 extraction_notes=f"Failed to decode image: {str(e)}"
             )
 
-        # Prepare content parts for Gemini: [prompt, image]
-        parts = [prompt, image]
+        def _set_image_metadata(data):
+            data['source_url'] = None
+            if source_description:
+                existing_notes = data.get('extraction_notes', '') or ''
+                data['extraction_notes'] = f"Source: {source_description}. {existing_notes}".strip()
 
-        # Retry loop with exponential backoff
-        last_error = None
-        response_text = ""
+        event_data, response_text = await self._generate_and_parse(
+            [prompt, image], post_parse=_set_image_metadata, error_context="Image extraction"
+        )
 
-        for attempt in range(self.max_retries):
-            try:
-                # Generate response
-                response = self.model.generate_content(parts)
-                response_text = self._clean_response_text(response.text)
+        if event_data is not None:
+            return Event(**event_data)
 
-                # Try to parse JSON
-                try:
-                    event_data = json.loads(response_text)
-                except json.JSONDecodeError as json_error:
-                    # Attempt JSON repair
-                    logger.warning(f"JSON parse failed, attempting repair: {json_error}")
-                    event_data = self._repair_json(response_text)
-
-                    if event_data is None:
-                        raise json_error
-
-                    # Mark as repaired
-                    existing_notes = event_data.get('extraction_notes', '') or ''
-                    event_data['extraction_notes'] = f"JSON parsing required repair. {existing_notes}".strip()
-                    logger.info("JSON repair successful")
-
-                # No source URL for image-only extraction
-                event_data['source_url'] = None
-
-                # Add source description to notes if provided
-                if source_description:
-                    existing_notes = event_data.get('extraction_notes', '') or ''
-                    event_data['extraction_notes'] = f"Source: {source_description}. {existing_notes}".strip()
-
-                # Convert to Event object (Pydantic will validate)
-                event = Event(**event_data)
-                return event
-
-            except Exception as e:
-                last_error = e
-                error_str = str(e)
-
-                # Check for rate limit (429) error
-                if "429" in error_str and attempt < self.max_retries - 1:
-                    sleep_time = self.base_delay * (2 ** attempt)
-                    logger.warning(f"Rate limited (429), retrying in {sleep_time}s (attempt {attempt + 1}/{self.max_retries})")
-                    await asyncio.sleep(sleep_time)
-                    continue
-
-                # Check for quota exhausted
-                if "quota" in error_str.lower() and attempt < self.max_retries - 1:
-                    sleep_time = self.base_delay * (2 ** attempt)
-                    logger.warning(f"Quota issue, retrying in {sleep_time}s (attempt {attempt + 1}/{self.max_retries})")
-                    await asyncio.sleep(sleep_time)
-                    continue
-
-                # For other errors on non-final attempt, retry with shorter delay
-                if attempt < self.max_retries - 1:
-                    logger.warning(f"Image extraction error, retrying: {error_str[:100]}")
-                    await asyncio.sleep(1)
-                    continue
-
-                # Final attempt failed
-                break
-
-        # All retries exhausted
-        error_msg = f"Failed after {self.max_retries} attempts: {str(last_error)}"
-        logger.error(f"Image extraction failed: {error_msg}")
-
+        error_msg = f"Failed after {self.max_retries} attempts"
         return Event(
             title="Extraction Failed",
             source_url=None,

@@ -128,12 +128,12 @@ Currently only dates are overridden from JSON-LD structured data. Extend to venu
 
 Small changes that reduce coupling without introducing abstractions.
 
-- [ ] Move ORB-specific constants to `.env` config instead of hardcoded in source:
+- [x] Move ORB-specific constants to `.env` config instead of hardcoded in source:
   - `oaklog.getgrist.com` → `GRIST_UI_HOST` in `agent/integrations/grist.py:18`
   - `ORB-Events` → `GRIST_UI_PAGE_NAME` in `agent/integrations/grist.py:19`
   - `b2r9qYM2Lr9x` (UI doc ID) → `GRIST_UI_DOC_ID` in `agent/integrations/grist.py:17`
-- [ ] Pass `LLMExtractor` as constructor parameter to `ScrapingOrchestrator` instead of hardcoding `GeminiExtractor()` at `agent/scraper/orchestrator.py:14` — one-line change, makes testing easier
-- [ ] Deduplicate the retry/JSON-repair logic between `extract_event()` and `extract_event_from_image()` in `agent/llm/gemini.py` — extract shared logic into private methods on `GeminiExtractor`
+- [x] Pass `LLMExtractor` as constructor parameter to `ScrapingOrchestrator` instead of hardcoding `GeminiExtractor()` at `agent/scraper/orchestrator.py:14` — one-line change, makes testing easier
+- [x] Deduplicate the retry/JSON-repair logic between `extract_event()` and `extract_event_from_image()` in `agent/llm/gemini.py` — extract shared logic into private methods on `GeminiExtractor`
 
 **Files:** `agent/integrations/grist.py`, `agent/core/config.py`, `agent/scraper/orchestrator.py`, `agent/llm/gemini.py`
 
@@ -141,15 +141,15 @@ Small changes that reduce coupling without introducing abstractions.
 
 ## Acceptance Criteria
 
-- [ ] SQLite database persists across Railway deploys
-- [ ] `pytest agent/tests/` passes with unit + integration tests
-- [ ] Events scraped during PDT months show correct Pacific times
-- [ ] Events near year boundaries (Dec→Jan) infer the correct year
-- [ ] Post-extraction validation catches bad dates without rejecting events
-- [ ] JSON-LD overrides venue/address/organizer from Eventbrite and Luma
-- [ ] All existing ORB Discord bot features work unchanged
-- [ ] No regressions on tested platforms (Eventbrite, Luma, BAMPFA, UCB Events, Instagram)
-- [ ] ORB-specific constants configurable via `.env`, not hardcoded
+- [ ] SQLite database persists across Railway deploys (requires Railway deploy to verify)
+- [x] `pytest agent/tests/` passes with unit + integration tests (47 tests)
+- [x] Events scraped during PDT months show correct Pacific times
+- [x] Events near year boundaries (Dec→Jan) infer the correct year
+- [x] Post-extraction validation catches bad dates without rejecting events
+- [x] JSON-LD overrides venue/address/organizer from Eventbrite and Luma
+- [ ] All existing ORB Discord bot features work unchanged (requires manual testing)
+- [ ] No regressions on tested platforms (requires live scrape testing)
+- [x] ORB-specific constants configurable via `.env`, not hardcoded
 
 ---
 
