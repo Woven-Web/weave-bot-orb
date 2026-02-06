@@ -174,17 +174,17 @@ New `slack/` directory, parallel to `discord/`.
 
 #### 2a. Slack bot core
 
-- [ ] Create `slack/` directory with `src/main.py`, `src/bot.py`, `src/config.py`
-- [ ] Use `slack-bolt` library with Socket Mode (no public URL needed)
-- [ ] Monitor configured channels for links (same URL detection logic)
-- [ ] Monitor for image uploads (download via Slack Files API with auth)
-- [ ] Send to Agent API `/parse` with `org_id` from channel->org mapping
-- [ ] Format event replies using Slack Block Kit (not Discord embeds)
+- [x] Create `slack/` directory with `src/main.py`, `src/bot.py`, `src/config.py`
+- [x] Use `slack-bolt` library with Socket Mode (no public URL needed)
+- [x] Monitor configured channels for links (same URL detection logic)
+- [x] Monitor for image uploads (download via Slack Files API with auth)
+- [x] Send to Agent API `/parse` with `org_id` from channel->org mapping
+- [x] Format event replies using Slack Block Kit (not Discord embeds)
 
 #### 2b. Callback handling
 
-- [ ] Webhook server on configurable port (default 3001, separate from Discord's 3000)
-- [ ] Receive agent callbacks, update Slack messages (edit, not delete+recreate)
+- [x] Webhook server on configurable port (default 3001, separate from Discord's 3000)
+- [x] Receive agent callbacks, update Slack messages (edit, not delete+recreate)
 - [ ] Track requests in SQLite (reuse schema pattern from Discord, with `platform` column)
 
 #### 2c. Editorial replies
@@ -195,18 +195,18 @@ New `slack/` directory, parallel to `discord/`.
 
 #### Tests
 
-- [ ] Unit tests for Slack message formatting (Block Kit output)
-- [ ] Unit tests for URL/image detection in Slack messages
+- [x] Unit tests for Slack message formatting (Block Kit output)
+- [x] Unit tests for URL/image detection in Slack messages
 - [ ] Mock agent callback tests
 
 ### Phase 3: Discord Bot Updates
 
 Minimal changes to keep ORB working with the new org-aware agent.
 
-- [ ] Update Discord bot to send `org_id: "orb"` and `client_reference_id` (was `discord_message_id`)
+- [x] Update Discord bot to send `org_id: "orb"` and `client_reference_id` (was `discord_message_id`)
 - [ ] Read org config to get Grist credentials (stop using separate `GRIST_API_KEY` env var)
-- [ ] Verify all existing functionality unchanged (editorial replies, calendar export)
-- [ ] Calendar export stays ORB-only for now
+- [x] Verify all existing functionality unchanged (editorial replies, calendar export)
+- [x] Calendar export stays ORB-only for now
 
 ---
 
