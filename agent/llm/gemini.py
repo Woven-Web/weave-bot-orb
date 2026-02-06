@@ -1,19 +1,17 @@
 """Gemini-based event extraction implementation."""
 import json
 import base64
-import re
 import asyncio
 import logging
 from typing import Optional, Dict, Any, Callable
-from datetime import datetime
 import google.generativeai as genai
 from PIL import Image
 import io
 
 from agent.llm.base import LLMExtractor
-from agent.core.schemas import Event, EventLocation, EventOrganizer
+from agent.llm.prompts import build_extraction_prompt, build_image_extraction_prompt
+from agent.core.schemas import Event
 from agent.core.config import settings
-from agent.core.time_utils import get_current_time, get_pacific_offset_str
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +19,14 @@ logger = logging.getLogger(__name__)
 class GeminiExtractor(LLMExtractor):
     """Gemini-based event information extractor."""
 
-    def __init__(self, model_name: str = "gemini-2.5-flash-lite"):
+    def __init__(self, model_name: str = "gemini-2.5-flash-lite",
+                 api_key: Optional[str] = None,
+                 timezone: str = "America/Los_Angeles"):
         """Initialize Gemini API client."""
-        genai.configure(api_key=settings.gemini_api_key)
+        genai.configure(api_key=api_key or settings.gemini_api_key)
         self.model_name = model_name
         self.model = genai.GenerativeModel(model_name)
+        self.timezone = timezone
 
         # Retry configuration
         self.max_retries = 3
@@ -33,65 +34,7 @@ class GeminiExtractor(LLMExtractor):
 
     def _build_extraction_prompt(self, url: str, content: str) -> str:
         """Build the prompt for event extraction."""
-        now = get_current_time()
-        current_date = now.strftime("%Y-%m-%d")
-        current_year = now.year
-        pacific_offset = get_pacific_offset_str()
-
-        return f"""You are an expert at extracting structured event information from web pages.
-
-Today's date is: {current_date}
-
-I will provide you with content from a webpage at: {url}
-
-Your task is to extract event information and return it as valid JSON matching this exact schema:
-
-{{
-  "title": "string (required - the event name/title)",
-  "description": "string or null (event description/details)",
-  "start_datetime": "ISO 8601 datetime WITH timezone offset (e.g., '2026-01-20T18:30:00{pacific_offset}')",
-  "end_datetime": "ISO 8601 datetime WITH timezone offset or null (e.g., '2026-01-20T21:00:00{pacific_offset}')",
-  "timezone": "string or null (e.g., 'America/Los_Angeles', 'PST') - also include offset in datetimes above",
-  "location": {{
-    "type": "physical" | "virtual" | "hybrid",
-    "venue": "string or null (venue name)",
-    "address": "string or null (full address)",
-    "city": "string or null",
-    "url": "string or null (for virtual events)"
-  }} or null,
-  "organizer": {{
-    "name": "string or null",
-    "contact": "string or null (email or phone)",
-    "url": "string or null"
-  }} or null,
-  "registration_url": "string or null (link to register/buy tickets)",
-  "price": "string or null (e.g., 'Free', '$20', '$10-$25')",
-  "tags": ["array", "of", "strings"],
-  "image_url": "string or null (main event image URL)",
-  "confidence_score": number between 0 and 1 (your confidence in this extraction),
-  "extraction_notes": "string or null (any issues, ambiguities, or important notes)"
-}}
-
-IMPORTANT INSTRUCTIONS:
-1. Return ONLY valid JSON, no markdown code blocks or other text
-2. Use null for any fields you cannot determine
-3. For dates/times:
-   - PREFER dates found in "STRUCTURED EVENT DATA" section if available - these are authoritative
-   - Use {current_year} as the year unless a different year is explicitly shown
-   - Exception: In Nov/Dec, if the event is for Jan/Feb without a year, use {current_year + 1}
-   - When in doubt, assume the current year ({current_year})
-4. For timezone:
-   - ALWAYS include timezone offset in the datetime string
-   - Default to Pacific Time: {pacific_offset} (current offset, accounts for DST)
-   - Only use a different timezone if explicitly stated in the content
-5. If the page contains MULTIPLE events, extract the PRIMARY or FIRST event
-6. Set confidence_score based on how complete and certain the information is
-7. Use extraction_notes to explain any assumptions, missing data, or ambiguities
-
-WEBPAGE CONTENT:
-{content}
-
-Return your JSON response now:"""
+        return build_extraction_prompt(url, content, timezone=self.timezone)
 
     def _clean_response_text(self, response_text: str) -> str:
         """Clean the LLM response text, removing markdown code blocks."""
@@ -241,67 +184,7 @@ Return your JSON response now:"""
 
     def _build_image_extraction_prompt(self) -> str:
         """Build the prompt for extracting event info from an image."""
-        now = get_current_time()
-        current_date = now.strftime("%Y-%m-%d")
-        current_year = now.year
-        pacific_offset = get_pacific_offset_str()
-
-        return f"""You are an expert at extracting event information from images such as event posters, flyers, screenshots, and promotional materials.
-
-Today's date is: {current_date}
-
-Analyze the attached image and extract event information. Return valid JSON matching this exact schema:
-
-{{
-  "title": "string (required - the event name/title)",
-  "description": "string or null (event description/details visible in the image)",
-  "start_datetime": "ISO 8601 datetime WITH timezone offset (e.g., '2026-01-20T18:30:00{pacific_offset}')",
-  "end_datetime": "ISO 8601 datetime WITH timezone offset or null (e.g., '2026-01-20T21:00:00{pacific_offset}')",
-  "timezone": "string or null (e.g., 'America/Los_Angeles', 'PST') - also include offset in datetimes above",
-  "location": {{
-    "type": "physical" | "virtual" | "hybrid",
-    "venue": "string or null (venue name)",
-    "address": "string or null (full address)",
-    "city": "string or null",
-    "url": "string or null (for virtual events)"
-  }} or null,
-  "organizer": {{
-    "name": "string or null",
-    "contact": "string or null (email or phone)",
-    "url": "string or null"
-  }} or null,
-  "registration_url": "string or null (link visible in image)",
-  "price": "string or null (e.g., 'Free', '$20', '$10-$25')",
-  "tags": ["array", "of", "strings"],
-  "image_url": null,
-  "confidence_score": number between 0 and 1 (your confidence in this extraction),
-  "extraction_notes": "string or null (note any text that's hard to read, cut off, or unclear)"
-}}
-
-IMPORTANT INSTRUCTIONS:
-1. Return ONLY valid JSON, no markdown code blocks or other text
-2. Use null for any fields you cannot determine from the image
-3. For dates/times:
-   - If only a date is shown without time, set a reasonable time based on context (evening events ~19:00)
-   - Use {current_year} as the year unless a different year is explicitly shown
-   - Exception: In Nov/Dec, if the event is for Jan/Feb without a year, use {current_year + 1}
-   - When in doubt, assume the current year ({current_year})
-4. For timezone:
-   - ALWAYS include timezone offset in datetime (e.g., '2026-01-20T19:00:00{pacific_offset}')
-   - Default to Pacific Time: {pacific_offset} (current offset, accounts for DST)
-   - Only use a different timezone if explicitly stated in the image
-5. Read ALL text in the image carefully - event details are often in smaller text
-6. Set confidence_score LOWER if:
-   - Text is blurry, small, or hard to read
-   - Information appears cut off or partially visible
-   - Image quality is poor
-   - You had to make assumptions about unclear text
-7. Use extraction_notes to document:
-   - Any text you couldn't read clearly
-   - Assumptions you made
-   - Parts of the image that seem cut off
-
-Return your JSON response now:"""
+        return build_image_extraction_prompt(timezone=self.timezone)
 
     async def extract_event_from_image(
         self,

@@ -80,6 +80,9 @@ async def save_event_to_grist(
     event: Event,
     api_key: Optional[str] = None,
     doc_id: Optional[str] = None,
+    ui_host: Optional[str] = None,
+    ui_doc_id: Optional[str] = None,
+    ui_page_name: Optional[str] = None,
     timeout: float = 15.0
 ) -> GristResult:
     """
@@ -89,6 +92,9 @@ async def save_event_to_grist(
         event: Event object to save
         api_key: Grist API key (defaults to settings)
         doc_id: Grist document ID (defaults to ORB Events doc)
+        ui_host: Grist UI host for record URLs (defaults to settings)
+        ui_doc_id: Grist UI document ID for record URLs (defaults to doc_id slug)
+        ui_page_name: Grist UI page name for record URLs (defaults to settings)
         timeout: Request timeout in seconds
 
     Returns:
@@ -96,6 +102,9 @@ async def save_event_to_grist(
     """
     api_key = api_key or settings.grist_api_key
     doc_id = doc_id or settings.grist_doc_id
+    ui_host = ui_host or settings.grist_ui_host
+    ui_doc_id = ui_doc_id or settings.grist_ui_doc_id
+    ui_page_name = ui_page_name or settings.grist_ui_page_name
 
     if not api_key:
         logger.error("No Grist API key configured")
@@ -135,7 +144,7 @@ async def save_event_to_grist(
                         # Format: https://HOST/DOC_ID/PAGE_NAME#a1.s4.rROW_ID.c0
                         # The anchor format is: a=area, s=section/widget, r=row, c=column
                         # s4 is the Events table widget on the ORB-Events page
-                        record_url = f"https://{settings.grist_ui_host}/{settings.grist_ui_doc_id}/{settings.grist_ui_page_name}#a1.s4.r{record_id}.c0"
+                        record_url = f"https://{ui_host}/{ui_doc_id}/{ui_page_name}#a1.s4.r{record_id}.c0"
 
                         logger.info(
                             f"Event saved to Grist: record_id={record_id}, "
