@@ -7,7 +7,7 @@ import logging
 from datetime import timedelta
 
 from agent.core.schemas import Event
-from agent.core.time_utils import get_current_time
+from agent.core.time_utils import get_current_time, PACIFIC
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +40,6 @@ def validate_event(event: Event) -> Event:
     if start is not None:
         # Make start offset-aware if naive (assume Pacific)
         if start.tzinfo is None:
-            from agent.core.time_utils import PACIFIC
             start = start.replace(tzinfo=PACIFIC)
 
         one_year_ago = now - timedelta(days=365)
@@ -58,7 +57,6 @@ def validate_event(event: Event) -> Event:
     end = event.end_datetime
     if start is not None and end is not None:
         if end.tzinfo is None:
-            from agent.core.time_utils import PACIFIC
             end = end.replace(tzinfo=PACIFIC)
 
         if end < start:
@@ -67,7 +65,9 @@ def validate_event(event: Event) -> Event:
             confidence_penalty += 0.1
 
     # Apply confidence penalty
-    current_score = event_dict.get("confidence_score") or 0.5
+    current_score = event_dict.get("confidence_score")
+    if current_score is None:
+        current_score = 0.5
     adjusted_score = max(0.0, current_score - confidence_penalty)
     if confidence_penalty > 0:
         event_dict["confidence_score"] = round(adjusted_score, 2)

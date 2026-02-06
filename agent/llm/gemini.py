@@ -4,7 +4,7 @@ import base64
 import re
 import asyncio
 import logging
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 from datetime import datetime
 import google.generativeai as genai
 from PIL import Image
@@ -137,7 +137,7 @@ Return your JSON response now:"""
     async def _generate_and_parse(
         self,
         parts: list,
-        post_parse: Optional[callable] = None,
+        post_parse: Optional[Callable[[Dict[str, Any]], None]] = None,
         error_context: str = "extraction",
     ) -> tuple[Optional[Dict[str, Any]], str]:
         """Shared retry loop with JSON repair for Gemini calls.

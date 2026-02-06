@@ -234,6 +234,9 @@ class ScrapingOrchestrator:
                 source_description=source_description
             )
 
+            # Validate extracted data (warns but never rejects)
+            event = validate_event(event)
+
             metadata["confidence_score"] = event.confidence_score
 
             # Check if extraction was successful
