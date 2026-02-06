@@ -1,7 +1,6 @@
 """Test fixtures for agent tests."""
 import os
 import pytest
-from unittest.mock import AsyncMock
 
 from agent.core.schemas import Event, EventLocation, EventOrganizer
 
@@ -62,10 +61,3 @@ def sample_json_ld():
     }
 
 
-@pytest.fixture
-def mock_llm_extractor(sample_event):
-    """A mock LLMExtractor that returns a canned Event."""
-    extractor = AsyncMock()
-    extractor.extract_event = AsyncMock(return_value=sample_event)
-    extractor.extract_event_from_image = AsyncMock(return_value=sample_event)
-    return extractor

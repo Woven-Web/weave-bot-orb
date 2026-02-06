@@ -19,6 +19,12 @@ class TestFormatDatetime:
         assert result == "2026-03-15T19:00:00"
         assert "+" not in result and "-07" not in result
 
+    def test_utc_datetime_converts_to_pacific(self):
+        # 2026-03-15 is during PDT (UTC-7), so 02:00 UTC = 19:00 PDT previous day
+        dt = datetime(2026, 3, 16, 2, 0, 0, tzinfo=timezone.utc)
+        result = _format_datetime(dt)
+        assert result == "2026-03-15T19:00:00"
+
 
 class TestEventToGristFields:
     def test_basic_fields(self, sample_event):

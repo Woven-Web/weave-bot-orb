@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from agent.core.schemas import Event
 from agent.core.config import settings
-from agent.core.time_utils import get_current_time
+from agent.core.time_utils import get_current_time, PACIFIC
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +29,14 @@ def _format_datetime(dt: Optional[datetime]) -> Optional[str]:
     """
     Format datetime for Grist API.
 
-    We strip timezone info and send naive datetime to prevent Grist
-    from converting to UTC. All events are assumed to be Pacific Time.
+    Converts to Pacific Time, then strips timezone info to prevent
+    Grist from converting to UTC.
     """
     if dt is None:
         return None
-    # Strip timezone to prevent Grist from converting to UTC
-    # The datetime is already in the correct local time (Pacific)
+    # Convert aware datetimes to Pacific before stripping tz
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(PACIFIC)
     naive_dt = dt.replace(tzinfo=None)
     return naive_dt.isoformat()
 
