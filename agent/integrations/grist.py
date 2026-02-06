@@ -1,22 +1,19 @@
 """Grist integration for saving events to the ORB Events database."""
 import aiohttp
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime
 from typing import Optional
 from dataclasses import dataclass
 
 from agent.core.schemas import Event
 from agent.core.config import settings
+from agent.core.time_utils import get_current_time, PACIFIC
 
 logger = logging.getLogger(__name__)
 
 # Grist configuration
 GRIST_API_BASE = "https://docs.getgrist.com/api"
-GRIST_DOC_ID = getattr(settings, 'grist_doc_id', None) or "b2r9qYM2Lr9xJ2epHVV1K2"
 GRIST_TABLE = "Events"
-# Short doc ID and page name for UI URLs (different from API doc ID)
-GRIST_UI_DOC_ID = "b2r9qYM2Lr9x"
-GRIST_UI_PAGE_NAME = "ORB-Events"
 
 
 @dataclass
@@ -32,13 +29,14 @@ def _format_datetime(dt: Optional[datetime]) -> Optional[str]:
     """
     Format datetime for Grist API.
 
-    We strip timezone info and send naive datetime to prevent Grist
-    from converting to UTC. All events are assumed to be Pacific Time.
+    Converts to Pacific Time, then strips timezone info to prevent
+    Grist from converting to UTC.
     """
     if dt is None:
         return None
-    # Strip timezone to prevent Grist from converting to UTC
-    # The datetime is already in the correct local time (Pacific)
+    # Convert aware datetimes to Pacific before stripping tz
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(PACIFIC)
     naive_dt = dt.replace(tzinfo=None)
     return naive_dt.isoformat()
 
@@ -60,7 +58,7 @@ def _event_to_grist_fields(event: Event) -> dict:
         "ImageURL": event.image_url,
         "ConfidenceScore": event.confidence_score,
         # Use Pacific Time for CreatedAt (naive datetime, no tz conversion by Grist)
-        "CreatedAt": datetime.now(timezone(timedelta(hours=-8))).replace(tzinfo=None).isoformat(),
+        "CreatedAt": get_current_time().replace(tzinfo=None).isoformat(),
     }
 
     # Location fields
@@ -96,8 +94,8 @@ async def save_event_to_grist(
     Returns:
         GristResult with success status and record URL if successful
     """
-    api_key = api_key or getattr(settings, 'grist_api_key', None)
-    doc_id = doc_id or GRIST_DOC_ID
+    api_key = api_key or settings.grist_api_key
+    doc_id = doc_id or settings.grist_doc_id
 
     if not api_key:
         logger.error("No Grist API key configured")
@@ -134,10 +132,10 @@ async def save_event_to_grist(
                     if records:
                         record_id = records[0].get("id")
                         # Build URL to the record in Grist
-                        # Format: https://oaklog.getgrist.com/DOC_ID/PAGE_NAME#a1.s4.rROW_ID.c0
+                        # Format: https://HOST/DOC_ID/PAGE_NAME#a1.s4.rROW_ID.c0
                         # The anchor format is: a=area, s=section/widget, r=row, c=column
                         # s4 is the Events table widget on the ORB-Events page
-                        record_url = f"https://oaklog.getgrist.com/{GRIST_UI_DOC_ID}/{GRIST_UI_PAGE_NAME}#a1.s4.r{record_id}.c0"
+                        record_url = f"https://{settings.grist_ui_host}/{settings.grist_ui_doc_id}/{settings.grist_ui_page_name}#a1.s4.r{record_id}.c0"
 
                         logger.info(
                             f"Event saved to Grist: record_id={record_id}, "
