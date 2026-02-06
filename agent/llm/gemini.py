@@ -227,6 +227,8 @@ Return your JSON response now:"""
         )
 
         if event_data is not None:
+            if event_data.get('title') is None:
+                event_data['title'] = "Unknown Event"
             return Event(**event_data)
 
         error_msg = f"Failed after {self.max_retries} attempts"
@@ -341,6 +343,8 @@ Return your JSON response now:"""
         )
 
         if event_data is not None:
+            if event_data.get('title') is None:
+                event_data['title'] = "Unknown Event"
             return Event(**event_data)
 
         error_msg = f"Failed after {self.max_retries} attempts"
