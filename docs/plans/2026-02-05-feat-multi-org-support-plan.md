@@ -132,41 +132,41 @@ Foundation work in the agent. No new chat adapters yet — testable via `/scrape
 
 #### 1a. Org config system
 
-- [ ] Create `agent/core/org_config.py` with `OrgConfig` pydantic model and YAML loader
-- [ ] Env var substitution (`${VAR}` -> `os.environ[VAR]`) at load time
-- [ ] `get_org_config(org_id: str) -> OrgConfig` lookup function
-- [ ] Default org (`"default"` maps to first org or `ORB_` env vars) for backward compat
-- [ ] Validate config on startup (required fields, API keys present)
+- [x] Create `agent/core/org_config.py` with `OrgConfig` pydantic model and YAML loader
+- [x] Env var substitution (`${VAR}` -> `os.environ[VAR]`) at load time
+- [x] `get_org_config(org_id: str) -> OrgConfig` lookup function
+- [x] Default org (`"default"` maps to first org or `ORB_` env vars) for backward compat
+- [x] Validate config on startup (required fields, API keys present)
 
 #### 1b. OpenAI-compatible LLM extractor
 
-- [ ] Create `agent/llm/openai_compat.py` implementing `LLMExtractor` ABC
-- [ ] Use `openai` Python SDK (works with any OpenAI-compatible endpoint via `base_url`)
-- [ ] Accept `api_key`, `model`, `endpoint_url` in constructor
-- [ ] Reuse prompt templates from Gemini (extract shared prompt builder)
-- [ ] Handle HuggingFace-specific errors (503 model loading, cold start delays)
-- [ ] `extract_event_from_image()`: raise `NotImplementedError` if provider doesn't support multimodal (log warning, return low-confidence text-only extraction)
+- [x] Create `agent/llm/openai_compat.py` implementing `LLMExtractor` ABC
+- [x] Use `openai` Python SDK (works with any OpenAI-compatible endpoint via `base_url`)
+- [x] Accept `api_key`, `model`, `endpoint_url` in constructor
+- [x] Reuse prompt templates from Gemini (extract shared prompt builder)
+- [x] Handle HuggingFace-specific errors (503 model loading, cold start delays)
+- [x] `extract_event_from_image()`: raise `NotImplementedError` if provider doesn't support multimodal (log warning, return low-confidence text-only extraction)
 
 #### 1c. LLM factory + per-org timezone
 
-- [ ] Create `agent/llm/factory.py` with `create_extractor(org_config) -> LLMExtractor`
-- [ ] Pass org timezone to prompt builder (replace hardcoded Pacific)
+- [x] Create `agent/llm/factory.py` with `create_extractor(org_config) -> LLMExtractor`
+- [x] Pass org timezone to prompt builder (replace hardcoded Pacific)
 - [ ] Pass org timezone to `validate_event()` and `_format_datetime()`
 
 #### 1d. Wire org_id through the pipeline
 
-- [ ] Rename `discord_message_id` -> `client_reference_id` in `schemas.py`, `callback.py`, `tasks.py`, `routes.py`
-- [ ] Add `org_id: str = "default"` to `ParseRequest`, `ScrapeRequest`, `ParseTask`, `CallbackPayload`
-- [ ] In `_run_task()`: load `OrgConfig`, create correct LLM extractor, pass Grist credentials
-- [ ] In `/scrape` endpoint: accept `org_id`, use correct LLM
+- [x] Rename `discord_message_id` -> `client_reference_id` in `schemas.py`, `callback.py`, `tasks.py`, `routes.py`
+- [x] Add `org_id: str = "default"` to `ParseRequest`, `ScrapeRequest`, `ParseTask`, `CallbackPayload`
+- [x] In `_run_task()`: load `OrgConfig`, create correct LLM extractor, pass Grist credentials
+- [x] In `/scrape` endpoint: accept `org_id`, use correct LLM
 - [ ] Update Discord bot to send `client_reference_id` and `org_id: "orb"`
 
 #### Tests
 
-- [ ] Unit tests for org config loading (valid YAML, missing fields, env var substitution)
-- [ ] Unit tests for OpenAI-compatible extractor (mock httpx responses)
-- [ ] Unit tests for LLM factory (returns correct extractor per provider)
-- [ ] Integration test: `/scrape` with `org_id` routes to correct LLM
+- [x] Unit tests for org config loading (valid YAML, missing fields, env var substitution)
+- [x] Unit tests for OpenAI-compatible extractor (mock httpx responses)
+- [x] Unit tests for LLM factory (returns correct extractor per provider)
+- [x] Integration test: `/scrape` with `org_id` routes to correct LLM
 
 ### Phase 2: Slack Adapter
 
